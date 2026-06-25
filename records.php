@@ -9,8 +9,8 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once 'db.php';
 
-// Fetch orders
-$query = "SELECT o.order_id, c.full_name, f.flower_name, o.qty_ordered, o.total_amount, o.order_date 
+// UPDATE 1: Added 'o.status' to the SELECT query
+$query = "SELECT o.order_id, c.full_name, f.flower_name, o.qty_ordered, o.total_amount, o.order_date, o.status 
           FROM tbl_orders o
           JOIN tbl_customers c ON o.customer_id = c.customer_id
           JOIN tbl_flowers f ON o.flower_id = f.flower_id
@@ -27,6 +27,24 @@ $result = isset($conn) ? $conn->query($query) : null;
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* A little extra styling to make the dropdown look like a clean status badge */
+        .status-select {
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border: 1px solid #e5e7eb;
+            background-color: #f9fafb;
+            cursor: pointer;
+            outline: none;
+        }
+        .status-select.pending { color: #d97706; background-color: #fef3c7; border-color: #fde68a; }
+        .status-select.processing { color: #2563eb; background-color: #dbeafe; border-color: #bfdbfe; }
+        .status-select.delivered { color: #059669; background-color: #d1fae5; border-color: #a7f3d0; }
+        .status-select.cancelled { color: #dc2626; background-color: #fee2e2; border-color: #fecaca; }
+    </style>
 </head>
 <body class="system-page">
     <div class="system-layout">
@@ -72,8 +90,10 @@ $result = isset($conn) ? $conn->query($query) : null;
                 if (isset($_GET['msg'])) {
                     if ($_GET['msg'] == 'deleted') {
                         echo "<p style='color:green; background: #d1fae5; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-check-circle'></i> Order successfully deleted and inventory restocked!</p>";
+                    } elseif ($_GET['msg'] == 'status_updated') {
+                        echo "<p style='color:green; background: #d1fae5; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-check-circle'></i> Order status updated successfully!</p>";
                     } elseif ($_GET['msg'] == 'error') {
-                        echo "<p style='color:red; background: #fee2e2; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-triangle-exclamation'></i> Error deleting order.</p>";
+                        echo "<p style='color:red; background: #fee2e2; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-triangle-exclamation'></i> Error processing request.</p>";
                     }
                 }
                 ?>
@@ -93,30 +113,39 @@ $result = isset($conn) ? $conn->query($query) : null;
                         </thead>
                         <tbody>
                             <?php
-                            // Check if query returned results
                             if (isset($result) && $result->num_rows > 0) {
-                                // Loop through each row of data
                                 while($row = $result->fetch_assoc()) {
-                                    // Format the date output (YYYY-MM-DD)
                                     $date = date("Y-m-d", strtotime($row['order_date']));
-                                    
-                                    // Format amount to 2 decimal places
                                     $amount = number_format($row['total_amount'], 2);
+                                    
+                                    // Make sure status has a fallback just in case
+                                    $current_status = isset($row['status']) ? $row['status'] : 'Pending';
+                                    
+                                    // Define the available statuses for the dropdown
+                                    $status_options = ['Pending', 'Processing', 'Delivered', 'Cancelled'];
                                     
                                     echo "<tr>";
                                     echo "<td>#" . htmlspecialchars($row['order_id']) . "</td>";
                                     echo "<td>" . htmlspecialchars($row['full_name']) . "</td>";
-                                    
-                                    // Combine flower name and quantity
                                     echo "<td>" . htmlspecialchars($row['flower_name']) . " (x" . $row['qty_ordered'] . ")</td>";
-                                    
                                     echo "<td>₱" . $amount . "</td>";
                                     echo "<td>" . $date . "</td>";
                                     
-                                    // Note: Defaulting to 'Pending' until a status column is added to the database
-                                    echo "<td><span class='status status--pending'>Pending</span></td>";
+                                    // UPDATE 2: The Live Status Dropdown Form
+                                    echo "<td>
+                                            <form action='update_status.php' method='POST' style='margin: 0;'>
+                                                <input type='hidden' name='order_id' value='" . $row['order_id'] . "'>
+                                                <select name='status' onchange='this.form.submit()' class='status-select " . strtolower($current_status) . "'>";
+                                                
+                                                foreach($status_options as $option) {
+                                                    $selected = ($option == $current_status) ? 'selected' : '';
+                                                    echo "<option value='$option' $selected>$option</option>";
+                                                }
+                                                
+                                    echo "      </select>
+                                            </form>
+                                          </td>";
                                     
-                                    // The Action Cell with the Live Delete Button
                                     echo "<td class='action-cell'>
                                             <a href='#' title='View'><i class='fa-solid fa-eye'></i></a>
                                             <a href='#' title='Edit'><i class='fa-solid fa-pen-to-square'></i></a>
@@ -125,7 +154,6 @@ $result = isset($conn) ? $conn->query($query) : null;
                                     echo "</tr>";
                                 }
                             } else {
-                                // Display this if the table is empty or connection fails
                                 echo "<tr><td colspan='7' style='text-align:center; padding: 20px;'>No orders found in the database.</td></tr>";
                             }
                             ?>
