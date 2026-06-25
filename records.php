@@ -20,6 +20,16 @@ $ordersResult = isset($conn) ? $conn->query($ordersQuery) : null;
 // 2. Fetch Inventory Data
 $inventoryQuery = "SELECT flower_id, flower_name, price, stock_qty FROM tbl_flowers ORDER BY flower_name ASC";
 $inventoryResult = isset($conn) ? $conn->query($inventoryQuery) : null;
+
+// 3. Fetch Customers & Lifetime Value Data
+$customersQuery = "SELECT c.customer_id, c.full_name, 
+                          COUNT(o.order_id) as total_orders, 
+                          COALESCE(SUM(o.total_amount), 0) as lifetime_value 
+                   FROM tbl_customers c 
+                   LEFT JOIN tbl_orders o ON c.customer_id = o.customer_id 
+                   GROUP BY c.customer_id 
+                   ORDER BY lifetime_value DESC";
+$customersResult = isset($conn) ? $conn->query($customersQuery) : null;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -47,10 +57,12 @@ $inventoryResult = isset($conn) ? $conn->query($inventoryQuery) : null;
         .status-select.delivered { color: #059669; background-color: #d1fae5; border-color: #a7f3d0; }
         .status-select.cancelled { color: #dc2626; background-color: #fee2e2; border-color: #fecaca; }
         
-        /* New Inventory Badges */
-        .stock-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        /* Badges */
+        .stock-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; display: inline-block; }
         .stock-good { background-color: #d1fae5; color: #059669; }
         .stock-low { background-color: #fee2e2; color: #dc2626; }
+        .badge-vip { background-color: #fef08a; color: #854d0e; }
+        .badge-standard { background-color: #f1f5f9; color: #475569; }
     </style>
 </head>
 <body class="system-page">
@@ -104,6 +116,10 @@ $inventoryResult = isset($conn) ? $conn->query($inventoryQuery) : null;
                         echo "<p style='color:green; background: #d1fae5; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-check-circle'></i> Order status updated successfully!</p>";
                     } elseif ($_GET['msg'] == 'stock_updated') {
                         echo "<p style='color:green; background: #d1fae5; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-check-circle'></i> Inventory stock updated successfully!</p>";
+                    } elseif ($_GET['msg'] == 'spoilage_added') {
+                        echo "<p style='color:#b45309; background: #fef3c7; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-triangle-exclamation'></i> Spoilage logged and inventory updated.</p>";
+                    } elseif ($_GET['msg'] == 'item_added') {
+                        echo "<p style='color:green; background: #d1fae5; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-check-circle'></i> New product added to catalog successfully!</p>";
                     } elseif ($_GET['msg'] == 'error') {
                         echo "<p style='color:red; background: #fee2e2; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-triangle-exclamation'></i> Error processing request.</p>";
                     }
@@ -168,6 +184,9 @@ $inventoryResult = isset($conn) ? $conn->query($inventoryQuery) : null;
                 </div>
 
                 <div id="inventory-view" class="tab-content" style="display: none;">
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+                        <a href="add_item.php" class="btn btn--primary" style="background-color: #10b981; border-color: #10b981;"><i class="fa-solid fa-plus"></i> Add New Product</a>
+                    </div>
                     <div class="table-wrapper">
                         <table class="data-table">
                             <thead>
@@ -186,7 +205,6 @@ $inventoryResult = isset($conn) ? $conn->query($inventoryQuery) : null;
                                     while($row = $inventoryResult->fetch_assoc()) {
                                         $stock = $row['stock_qty'];
                                         
-                                        // Logic to determine if stock is healthy or low
                                         if ($stock <= 5) {
                                             $badgeClass = "stock-low";
                                             $badgeText = "Low Stock";
@@ -203,7 +221,7 @@ $inventoryResult = isset($conn) ? $conn->query($inventoryQuery) : null;
                                         echo "<td><span class='stock-badge $badgeClass'>$badgeText</span></td>";
                                         echo "<td class='action-cell'>
                                                 <a href='edit_stock.php?id=" . $row['flower_id'] . "' title='Edit Stock'><i class='fa-solid fa-pen-to-square'></i></a>
-                                                <a href='#' title='Add Spoilage' style='color:#f59e0b;'><i class='fa-solid fa-triangle-exclamation'></i></a>
+                                                <a href='add_spoilage.php?id=" . $row['flower_id'] . "' title='Add Spoilage' style='color:#f59e0b;'><i class='fa-solid fa-triangle-exclamation'></i></a>
                                               </td>";
                                         echo "</tr>";
                                     }
@@ -217,10 +235,51 @@ $inventoryResult = isset($conn) ? $conn->query($inventoryQuery) : null;
                 </div>
 
                 <div id="customers-view" class="tab-content" style="display: none;">
-                    <div class="dashboard-card" style="text-align: center; padding: 50px 20px;">
-                        <i class="fa-solid fa-users" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 15px;"></i>
-                        <h3 style="color: #475569;">Customer Directory</h3>
-                        <p style="color: #64748b;">The customer management module is currently under construction.</p>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Customer ID</th>
+                                    <th>Full Name</th>
+                                    <th>Total Orders</th>
+                                    <th>Lifetime Value</th>
+                                    <th>Customer Tier</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                if (isset($customersResult) && $customersResult->num_rows > 0) {
+                                    while($row = $customersResult->fetch_assoc()) {
+                                        $lifetime_value = $row['lifetime_value'];
+                                        $formatted_value = number_format($lifetime_value, 2);
+                                        
+                                        // Auto-calculate VIP status based on spend
+                                        if ($lifetime_value >= 2000) {
+                                            $tierClass = "badge-vip";
+                                            $tierText = "<i class='fa-solid fa-star'></i> VIP";
+                                        } else {
+                                            $tierClass = "badge-standard";
+                                            $tierText = "Standard";
+                                        }
+                                        
+                                        echo "<tr>";
+                                        echo "<td>#" . htmlspecialchars($row['customer_id']) . "</td>";
+                                        echo "<td style='font-weight: 500;'>" . htmlspecialchars($row['full_name']) . "</td>";
+                                        echo "<td>" . htmlspecialchars($row['total_orders']) . " orders</td>";
+                                        echo "<td>₱" . $formatted_value . "</td>";
+                                        echo "<td><span class='stock-badge $tierClass'>$tierText</span></td>";
+                                        echo "<td class='action-cell'>
+                                                <a href='#' title='View History'><i class='fa-solid fa-address-card'></i></a>
+                                              </td>";
+                                        echo "</tr>";
+                                    }
+                                } else {
+                                    echo "<tr><td colspan='6' style='text-align:center; padding: 20px;'>No customers found.</td></tr>";
+                                }
+                                ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -230,40 +289,35 @@ $inventoryResult = isset($conn) ? $conn->query($inventoryQuery) : null;
     
     <script src="js/main.js"></script>
     
- <script>
+    <script>
         document.addEventListener('DOMContentLoaded', function() {
             const tabs = document.querySelectorAll('.records-tab');
             const contents = document.querySelectorAll('.tab-content');
 
-            // 1. Standard Tab Switching Logic
             tabs.forEach(tab => {
                 tab.addEventListener('click', () => {
                     tabs.forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
                     
                     contents.forEach(content => content.style.display = 'none');
-                    
                     const targetId = tab.getAttribute('data-target');
                     document.getElementById(targetId).style.display = 'block';
                 });
             });
 
-            // 2. Check the URL for status messages
             const urlParams = new URLSearchParams(window.location.search);
             const msg = urlParams.get('msg');
 
-            // 3. Auto-open the Inventory tab if we just updated stock
-            if (msg === 'stock_updated') {
+            // Auto-open Inventory tab for stock updates, spoilage, or new items
+            if (msg === 'stock_updated' || msg === 'spoilage_added' || msg === 'item_added') {
                 document.querySelector('[data-target="inventory-view"]').click();
             }
 
-            // 4. Auto-hide messages after 3 seconds and clean the URL
+            // Auto-hide alerts after 3 seconds
             const alertMessages = document.querySelectorAll('.system-content > p');
             if (alertMessages.length > 0) {
                 setTimeout(() => {
-                    // Hide the message
                     alertMessages.forEach(alert => alert.style.display = 'none');
-                    // Remove the ?msg=... from the URL so it doesn't come back on refresh
                     window.history.replaceState(null, '', window.location.pathname);
                 }, 3000);
             }
