@@ -120,11 +120,18 @@ $customersResult = isset($conn) ? $conn->query($customersQuery) : null;
                         echo "<p style='color:#b45309; background: #fef3c7; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-triangle-exclamation'></i> Spoilage logged and inventory updated.</p>";
                     } elseif ($_GET['msg'] == 'item_added') {
                         echo "<p style='color:green; background: #d1fae5; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-check-circle'></i> New product added to catalog successfully!</p>";
+                    } elseif ($_GET['msg'] == 'item_deleted') {
+                        echo "<p style='color:green; background: #d1fae5; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-check-circle'></i> Product permanently deleted from catalog.</p>";
+                    } elseif ($_GET['msg'] == 'item_delete_fk_error') {
+                        echo "<p style='color:red; background: #fee2e2; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-triangle-exclamation'></i> Cannot delete this product because it is attached to existing customer orders. Edit the stock to 0 instead.</p>";
+                    } elseif ($_GET['msg'] == 'customer_added') {
+                        echo "<p style='color:green; background: #d1fae5; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-check-circle'></i> New customer registered successfully!</p>";
                     } elseif ($_GET['msg'] == 'error') {
                         echo "<p style='color:red; background: #fee2e2; padding: 10px; border-radius: 6px; margin-bottom: 15px;'><i class='fa-solid fa-triangle-exclamation'></i> Error processing request.</p>";
                     }
                 }
                 ?>
+
 
                 <div id="orders-view" class="tab-content" style="display: block;">
                     <div class="table-wrapper">
@@ -222,6 +229,7 @@ $customersResult = isset($conn) ? $conn->query($customersQuery) : null;
                                         echo "<td class='action-cell'>
                                                 <a href='edit_stock.php?id=" . $row['flower_id'] . "' title='Edit Stock'><i class='fa-solid fa-pen-to-square'></i></a>
                                                 <a href='add_spoilage.php?id=" . $row['flower_id'] . "' title='Add Spoilage' style='color:#f59e0b;'><i class='fa-solid fa-triangle-exclamation'></i></a>
+                                                <a href='delete_item.php?id=" . $row['flower_id'] . "' onclick=\"return confirm('Are you sure you want to permanently delete this product?');\" title='Delete Product' style='color: #ef4444;'><i class='fa-solid fa-trash'></i></a>
                                               </td>";
                                         echo "</tr>";
                                     }
@@ -235,6 +243,9 @@ $customersResult = isset($conn) ? $conn->query($customersQuery) : null;
                 </div>
 
                 <div id="customers-view" class="tab-content" style="display: none;">
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+                        <a href="add_customer.php" class="btn btn--primary" style="background-color: #3b82f6; border-color: #3b82f6;"><i class="fa-solid fa-user-plus"></i> Add New Customer</a>
+                    </div>
                     <div class="table-wrapper">
                         <table class="data-table">
                             <thead>
@@ -308,8 +319,10 @@ $customersResult = isset($conn) ? $conn->query($customersQuery) : null;
             const urlParams = new URLSearchParams(window.location.search);
             const msg = urlParams.get('msg');
 
-            // Auto-open Inventory tab for stock updates, spoilage, or new items
-            if (msg === 'stock_updated' || msg === 'spoilage_added' || msg === 'item_added') {
+            // Auto-open Customers or Inventory tab for relevant actions
+            if (msg === 'view_customers' || msg === 'customer_added') {
+                document.querySelector('[data-target="customers-view"]').click();
+            } else if (msg === 'stock_updated' || msg === 'spoilage_added' || msg === 'item_added') {
                 document.querySelector('[data-target="inventory-view"]').click();
             }
 

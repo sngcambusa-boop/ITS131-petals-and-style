@@ -1203,6 +1203,22 @@ ul { list-style: none; }
 .text-danger:hover { color: #dc2626 !important; }
 .text-success { color: #059669 !important; font-weight: 600; }
 
+.status-select {
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid #e5e7eb;
+    background-color: #f9fafb;
+    cursor: pointer;
+    outline: none;
+}
+.status-select.pending { color: #d97706; background-color: #fef3c7; border-color: #fde68a; }
+.status-select.processing { color: #2563eb; background-color: #dbeafe; border-color: #bfdbfe; }
+.status-select.delivered { color: #059669; background-color: #d1fae5; border-color: #a7f3d0; }
+.status-select.cancelled { color: #dc2626; background-color: #fee2e2; border-color: #fecaca; }
+
+
 .pagination {
     display: flex;
     justify-content: space-between;
