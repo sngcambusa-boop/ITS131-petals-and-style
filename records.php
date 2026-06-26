@@ -176,7 +176,7 @@ $customersResult = isset($conn) ? $conn->query($customersQuery) : null;
                                               </td>";
                                         
                                         echo "<td class='action-cell'>
-                                                <a href='#' title='View'><i class='fa-solid fa-eye'></i></a>
+                                                <a href='view_orders.php?id=" . $row['order_id'] . "' title='View'><i class='fa-solid fa-eye'></i></a>
                                                 <a href='delete_order.php?id=" . $row['order_id'] . "' onclick=\"return confirm('Are you sure you want to delete this order? The items will be restocked.');\" title='Delete' style='color: #ef4444;'><i class='fa-solid fa-trash'></i></a>
                                               </td>";
                                         echo "</tr>";
@@ -244,7 +244,7 @@ $customersResult = isset($conn) ? $conn->query($customersQuery) : null;
 
                 <div id="customers-view" class="tab-content" style="display: none;">
                     <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
-                        <a href="add_customer.php" class="btn btn--primary" style="background-color: #3b82f6; border-color: #3b82f6;"><i class="fa-solid fa-user-plus"></i> Add New Customer</a>
+                        <a href="add_customers.php" class="btn btn--primary" style="background-color: #3b82f6; border-color: #3b82f6;"><i class="fa-solid fa-user-plus"></i> Add New Customer</a>
                     </div>
                     <div class="table-wrapper">
                         <table class="data-table">
